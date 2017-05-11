@@ -236,7 +236,7 @@ function reviewAsAttachment(review) {
 }
 
 function GetAvailableDates(session) {
-    http.get("http://192.168.1.84:8087/api/Employee/GetAvailableDates", function (res) {
+    http.get("http://webapilearning20170503122156.azurewebsites.net/api/Employee/GetAvailableDates", function (res) {
         res.on('data', function (data) {
             session.userData.availableDates = JSON.parse(data);
             session.beginDialog("GetDates");
@@ -245,7 +245,7 @@ function GetAvailableDates(session) {
 };
 
 function GetAvailableSlots(session) {
-    var url = "http://192.168.1.84:8087/api/Employee/GetAvailableSlots/"+session.userData.selectedDate;
+    var url = "http://webapilearning20170503122156.azurewebsites.net/api/Employee/GetAvailableSlots/"+session.userData.selectedDate;
     http.get(url, function (res) {
         res.on('data', function (data) {
             session.userData.availableSlots = JSON.parse(data);
@@ -263,7 +263,7 @@ function GetAvailableSlots(session) {
 function BookSlot(session) {
     var hour = String(session.userData.selectedSlot).substring(0,2);
     var min = String(session.userData.selectedSlot).substring(3,5);
-    var url = "http://192.168.1.84:8087/api/Employee/BookAppoitment/"+session.userData.selectedDate+"/"+hour+"/"+ min+ "/"+session.userData.userName;
+    var url = "http://webapilearning20170503122156.azurewebsites.net/api/Employee/BookAppoitment/"+session.userData.selectedDate+"/"+hour+"/"+ min+ "/"+session.userData.userName;
     http.get(url, function (res) {
         res.on('data', function (data) {
             //session.userData.availableSlots = JSON.parse(data);
