@@ -48,6 +48,7 @@ bot.dialog('Grretings', [
 ]).triggerAction({
     matches: 'Grretings'
 });
+
 bot.dialog('UserProfile', [
    
 
@@ -64,7 +65,6 @@ bot.dialog('UserProfile', [
 ]).triggerAction({
     matches: 'UserProfile'
 });
-
 
 bot.dialog('Goodbye', [
 function (session) {
@@ -83,30 +83,30 @@ bot.dialog('SearchCarServiceCenter', [
         session.send('Welcome to the Car Service Center finder! We are analyzing your message: \'%s\'', session.message.text);
         builder.Prompts.text(session, 'Please enter your destination');
         // try extracting entities
-        var cityEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'builtin.geography.city');
-        var airportEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'AirportCode');
-        if (cityEntity) {
-            // city entity detected, continue to next step
-            session.dialogData.searchType = 'city';
-            next({ response: cityEntity.entity });
-        } else if (airportEntity) {
-            // airport entity detected, continue to next step
-            session.dialogData.searchType = 'airport';
-            next({ response: airportEntity.entity });
-        } else {
-            //no entities detected, ask user for a destination
-            builder.Prompts.text(session, 'Please enter your destination');
-       }
+        // var cityEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'builtin.geography.city');
+        // var airportEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'AirportCode');
+        // if (cityEntity) {
+        //     // city entity detected, continue to next step
+        //     session.dialogData.searchType = 'city';
+        //     next({ response: cityEntity.entity });
+        // } else if (airportEntity) {
+        //     // airport entity detected, continue to next step
+        //     session.dialogData.searchType = 'airport';
+        //     next({ response: airportEntity.entity });
+        // } else {
+            // no entities detected, ask user for a destination
+            //builder.Prompts.text(session, 'Please enter your destination');
+       // }
     },
     function (session, results) {
         var destination = results.response;
 
          var message = 'Looking for Car Service Center....';
-        if (session.dialogData.searchType === 'airport') {
-            message += ' near %s airport...';
-        } else {
+        // if (session.dialogData.searchType === 'airport') {
+        //     message += ' near %s airport...';
+        // } else {
             message += ' near  %s...';
-        }
+        //}
 
         session.send(message, destination);
 
@@ -236,7 +236,7 @@ function reviewAsAttachment(review) {
 }
 
 function GetAvailableDates(session) {
-    http.get("http://webapilearning20170503122156.azurewebsites.net/api/Employee/GetAvailableDates", function (res) {
+    http.get("http://192.168.1.84:8087/api/Employee/GetAvailableDates", function (res) {
         res.on('data', function (data) {
             session.userData.availableDates = JSON.parse(data);
             session.beginDialog("GetDates");
@@ -245,7 +245,7 @@ function GetAvailableDates(session) {
 };
 
 function GetAvailableSlots(session) {
-    var url = "http://webapilearning20170503122156.azurewebsites.net/api/Employee/GetAvailableSlots/"+session.userData.selectedDate;
+    var url = "http://192.168.1.84:8087/api/Employee/GetAvailableSlots/"+session.userData.selectedDate;
     http.get(url, function (res) {
         res.on('data', function (data) {
             session.userData.availableSlots = JSON.parse(data);
@@ -263,7 +263,7 @@ function GetAvailableSlots(session) {
 function BookSlot(session) {
     var hour = String(session.userData.selectedSlot).substring(0,2);
     var min = String(session.userData.selectedSlot).substring(3,5);
-    var url = "http://webapilearning20170503122156.azurewebsites.net/api/Employee/BookAppoitment/"+session.userData.selectedDate+"/"+hour+"/"+ min+ "/"+session.userData.userName;
+    var url = "http://192.168.1.84:8087/api/Employee/BookAppoitment/"+session.userData.selectedDate+"/"+hour+"/"+ min+ "/"+session.userData.userName;
     http.get(url, function (res) {
         res.on('data', function (data) {
             //session.userData.availableSlots = JSON.parse(data);
