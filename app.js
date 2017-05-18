@@ -29,55 +29,118 @@ var bot = new builder.UniversalBot(connector, function (session) {
 // This Url can be obtained by uploading or creating your model from the LUIS portal: https://www.luis.ai/
 var recognizer = new builder.LuisRecognizer(process.env.LUIS_MODEL_URL);
 bot.recognizer(recognizer);
-var dialog = new builder.IntentDialog({recognizer:[recognizer]});
-
-
+var dialog = new builder.IntentDialog({ recognizer: [recognizer] });
 bot.dialog('Grretings', [
     function (session) {
-        builder.Prompts.text(session, "Welcome to the Car Service Center finder! May I know your name?");
-    },    
-    function (session,results) {
-        session.userData.userName = results.response;
-       var servicesOption = ['Search car wash', 'Search car service'];
-        builder.Prompts.choice(session, "Hi " + results.response + ", please select one of the service options below", servicesOption, { listStyle: builder.ListStyle.button });
-    }, 
+        if(session.userData.userName && session.userData.email && session.userData.mobile){
+            //session.send("Hello " +session.userData.userName);
+            session.beginDialog('ServiceOption');
+            //session.beginDialog('UserProfile');
+        }
+        else if(session.userData.userName && !session.userData.email){
+            session.send("Hello " +session.userData.userName);
+            session.beginDialog('Email');
+        }
+        else if(session.userData.userName && session.userData.email&& !session.userData.mobile){
+            session.send("Hello " +session.userData.userName);
+            session.beginDialog('Mobile');
+        }
+        else{
+            builder.Prompts.text(session,"Welcome to the Car Service Center finder! May I know your name?");           
+        }
+            
+    },
     function(session,results){
-        session.userData.serviceType = results.response.entity;
-        session.beginDialog("SearchCarServiceCenter");
+        session.userData.userName = results.response;
+        session.beginDialog('Email');
     }
+    
 ]).triggerAction({
     matches: 'Grretings'
 });
+bot.dialog('Email',[
+    function (session, results) {
+        builder.Prompts.text(session, "Kindly provide your email for communication");
+    },
+    function (session, results) {
+        session.userData.email = results.response;
+        ValidateEmail(session);
+        //builder.Prompts.text(session,"Kindly provide your mobile number for communication");
+    }
+]);
+bot.dialog('InvalidEmail', [
+    function (session, results) {
+        builder.Prompts.text(session, "Invalid Email,Kindly provide valid email");
+    },
+    function (session, results) {
+        session.userData.email = results.response;
+        ValidateEmail(session);
+    }
+]);
+bot.dialog('InvalidMobileNum', [
+    function (session, results) {
+        builder.Prompts.text(session, "Invalid number,Kindly provide valid 10 digit number");
+    },
+    function (session, results) {
+        session.userData.mobile = results.response;
+        ValidateMobileNum(session);
+    }
+]);
 
-bot.dialog('UserProfile', [
-   
-
-   function (session, args, next) {
-        var nameEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'Name');   
-        session.userData.userName =  nameEntity.entity;
-       var servicesOption = ['Search car wash', 'Search car service'];
-        builder.Prompts.choice(session, "Hi " +  nameEntity.entity + ", please select one of the service options below", servicesOption, { listStyle: builder.ListStyle.button });
-    }, 
-    function(session,results){
+bot.dialog('Mobile', [
+    function (session, results) {
+        if(!session.userData.mobile)
+        builder.Prompts.text(session, "Kindly provide your 10 digit number for communication");
+        else session.beginDialog('ServiceOption');
+    },
+    function (session, results) {
+        session.userData.mobile = results.response;
+        ValidateMobileNum(session);
+    }
+]);
+bot.dialog('ServiceOption', [
+    function (session, results) {
+        var servicesOption = ['Car service', 'Car wash'];
+        builder.Prompts.choice(session, "Hi " + session.userData.userName + ", please select one of the service options below", servicesOption, { listStyle: builder.ListStyle.button });
+    },
+    function (session, results) {
         session.userData.serviceType = results.response.entity;
         session.beginDialog("SearchCarServiceCenter");
+    }
+]);
+bot.dialog('UserProfile', [
+    function (session, args, next) {
+        if(!session.userData.userName){
+        var nameEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'Name');
+        session.userData.userName = nameEntity?nameEntity.entity:"";
+        session.beginDialog('Email');
+    }
+    else
+    {
+        var email = builder.EntityRecognizer.findEntity(args.intent.entities, 'builtin.email');
+        session.userData.email = email;
+        ValidateEmail(session);
+    }
+   
     }
 ]).triggerAction({
     matches: 'UserProfile'
 });
 
 bot.dialog('Goodbye', [
-function (session) {
-builder.Prompts.text(session, "Bye. Looking forward to our next awesome conversation already.");
-} 
-]).triggerAction({
-matches: 'Goodbye'
-}); 
-bot.dialog('Booking',[
-    function(session,results){
-    GetAvailableDates(session);
+    function  (session) {
+        builder.Prompts.text(session,  "Bye. Looking forward to our next awesome conversation already.");
     }
-]);
+]).triggerAction({
+    matches:  'Goodbye'
+});
+bot.dialog('Booking', [
+    function (session, results) {
+        GetAvailableDates(session);
+    }
+]).triggerAction({
+    matches:  'Booking'
+});
 bot.dialog('SearchCarServiceCenter', [
     function (session, args, next) {
         session.send('Welcome to the Car Service Center finder! We are analyzing your message: \'%s\'', session.message.text);
@@ -94,18 +157,18 @@ bot.dialog('SearchCarServiceCenter', [
         //     session.dialogData.searchType = 'airport';
         //     next({ response: airportEntity.entity });
         // } else {
-            // no entities detected, ask user for a destination
-            //builder.Prompts.text(session, 'Please enter your destination');
-       // }
+        // no entities detected, ask user for a destination
+        //builder.Prompts.text(session, 'Please enter your destination');
+        // }
     },
     function (session, results) {
         var destination = results.response;
 
-         var message = 'Looking for Car Service Center....';
+        var message = 'Looking for Car Service Center....';
         // if (session.dialogData.searchType === 'airport') {
         //     message += ' near %s airport...';
         // } else {
-            message += ' near  %s...';
+        message += ' near  %s...';
         //}
 
         session.send(message, destination);
@@ -120,53 +183,50 @@ bot.dialog('SearchCarServiceCenter', [
                 var message = new builder.Message(session)
                     .attachmentLayout(builder.AttachmentLayout.carousel)
                     .attachments(hotels.map(hotelAsAttachment));
-                    builder.Prompts.choice(session, message, "select:100|select:101|select:102");
+                builder.Prompts.choice(session, message, "select:100|select:101|select:102");
                 //session.send(message);
 
                 // End
                 //session.endDialog();
             });
     },
-    function(session,results){ 
+    function (session, results) {
         session.userData.ServiceCentre = results.response.entity;
         session.beginDialog("Booking");
-        
-    //builder.Prompts.choice(session, "Please select the any avialble slot ", session.userData.availableDates, { listStyle: builder.ListStyle.button }); 
     }
-// function(session,results){ 
-//         builder.Prompts.text(session, session.userData.userName + " booking for " +results.response.entity + " slot is completed. Happy to help you");
-//         session.endDialog();
-//     }
 ]).triggerAction({
     matches: 'SearchCarServiceCenter',
     onInterrupted: function (session) {
         session.send('Please provide a destination');
     }
 });
-bot.dialog('GetDates',[
-    function(session, result){
-builder.Prompts.choice(session, "Please select the any available date ", session.userData.availableDates, { listStyle: builder.ListStyle.button });
-},
-function(session,results){ 
-    session.userData.selectedDate = results.response.entity;
-    GetAvailableSlots(session);  
+bot.dialog('GetDates', [
+    function (session, result) {
+        builder.Prompts.choice(session, "Please select the any available date ", session.userData.availableDates, { listStyle: builder.ListStyle.button });
+    },
+    function (session, results) {
+        session.userData.selectedDate = results.response.entity;
+        GetAvailableSlots(session);
     }
 ]);
 
-bot.dialog('GetSlots',[
-    function(session, result){
+bot.dialog('GetSlots', [
+    function (session, result) {
         builder.Prompts.choice(session, "Please select the any available slot ", session.userData.availableSlots, { listStyle: builder.ListStyle.button });
-},
-function(session,results){
-    session.userData.selectedSlot = results.response.entity;
-    BookSlot(session);
-}
+    },
+    function (session, results) {
+        session.userData.selectedSlot = results.response.entity;
+        BookSlot(session);
+    }
 ]);
-bot.dialog('BookingConfirmed',[
- function(session,results){
-     builder.Prompts.text(session,"Booking Done");
-     session.endDialog("Happy to help");
- }
+bot.dialog('BookingConfirmed', [
+    function (session, results) {
+         var message = new builder.Message(session)
+                    .addAttachment(BookingConfirmedAsAttachemnt(session));
+                    session.send(message);
+                    //session.reset();
+        session.endDialog("Happy to help");
+    }
 ]);
 bot.dialog('ShowCarServiceCentersReviews', function (session, args) {
     // retrieve hotel name from matched entities
@@ -186,7 +246,7 @@ bot.dialog('ShowCarServiceCentersReviews', function (session, args) {
 });
 
 bot.dialog('Help', function (session) {
-    session.endDialog('Hi! Try asking me things like \'search hotels in Seattle\', \'search hotels near LAX airport\' or \'show me the reviews of The Bot Resort\'');
+    session.endDialog('Hi! Try asking me things like \'search car service\', \'search wash\' or \'show me the reviews of The Bot Resort\'');
 }).triggerAction({
     matches: 'Help'
 });
@@ -220,11 +280,11 @@ function hotelAsAttachment(hotel) {
                 .title('Show in Map')
                 .type('openUrl')
                 .value('http://maps.google.com/?q=' + encodeURIComponent(hotel.location)),
-               new builder.CardAction()
+            new builder.CardAction()
                 .title('Book a slot')
                 .type('imBack')
-                .value('Book a slot for '+hotel.name)
-              
+                .value('Book a slot for ' + hotel.name)
+
         ]);
 }
 
@@ -235,8 +295,21 @@ function reviewAsAttachment(review) {
         .images([new builder.CardImage().url(review.image)]);
 }
 
+function BookingConfirmedAsAttachemnt(session){
+    return new builder.HeroCard()
+        .title(session.userData.userName+" your booking for "+session.userData.serviceType + " on "+session.userData.selectedDate+ " at " +session.userData.selectedSlot +" has been confirmed.")
+        .subtitle("Your communication details")
+        .text("Email- "+session.userData.email+" Mobile Number- "+session.userData.mobile)
+        .images([new builder.CardImage().url("~/image.png")]);
+}
+
+/**
+ * 
+ *API call function starts
+ */
+
 function GetAvailableDates(session) {
-    http.get("http://webapilearning20170503122156.azurewebsites.net/api/Employee/GetAvailableDates", function (res) {
+    http.get("http://webapilearning20170517094105.azurewebsites.net/api/Employee/GetAvailableDates", function (res) {
         res.on('data', function (data) {
             session.userData.availableDates = JSON.parse(data);
             session.beginDialog("GetDates");
@@ -245,25 +318,25 @@ function GetAvailableDates(session) {
 };
 
 function GetAvailableSlots(session) {
-    var url = "http://webapilearning20170503122156.azurewebsites.net/api/Employee/GetAvailableSlots/"+session.userData.selectedDate;
+    var url = "http://webapilearning20170517094105.azurewebsites.net/api/Employee/GetAvailableSlots/" + session.userData.selectedDate;
     http.get(url, function (res) {
         res.on('data', function (data) {
             session.userData.availableSlots = JSON.parse(data);
-            if(session.userData.availableSlots.length == 0){
+            if (session.userData.availableSlots.length == 0) {
                 session.send("Currently no slot avialable,Kindly selected some other date");
                 session.beginDialog("GetDates");
             }
-            else{
+            else {
                 session.beginDialog("GetSlots");
             }
-            
+
         });
     })
 };
 function BookSlot(session) {
-    var hour = String(session.userData.selectedSlot).substring(0,2);
-    var min = String(session.userData.selectedSlot).substring(3,5);
-    var url = "http://webapilearning20170503122156.azurewebsites.net/api/Employee/BookAppoitment/"+session.userData.selectedDate+"/"+hour+"/"+ min+ "/"+session.userData.userName;
+    var hour = String(session.userData.selectedSlot).substring(0, 2);
+    var min = String(session.userData.selectedSlot).substring(3, 5);
+    var url = "http://webapilearning20170517094105.azurewebsites.net/api/Employee/BookAppoitment/" + session.userData.selectedDate + "/" + hour + "/" + min + "/" + session.userData.userName + "/"+session.userData.email + "/"+ session.userData.mobile;
     http.get(url, function (res) {
         res.on('data', function (data) {
             //session.userData.availableSlots = JSON.parse(data);
@@ -271,3 +344,35 @@ function BookSlot(session) {
         });
     })
 };
+/**
+ * 
+ *API call function End
+ */
+
+/**
+ * 
+ *Validate function starts
+ */
+function ValidateEmail(session) {
+    var re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+    if (re.test(session.userData.email)) {
+        session.beginDialog("Mobile");
+    }
+    else {
+        session.beginDialog("InvalidEmail");
+    }
+}
+
+function ValidateMobileNum(session) {
+    var re = /^\d{10}$/;
+    if (re.test(session.userData.mobile)) {
+        session.beginDialog("ServiceOption");
+    }
+    else {
+        session.beginDialog("InvalidMobileNum");
+    }
+}
+/**
+ * 
+ *API call function Ends
+ */
