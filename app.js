@@ -32,33 +32,33 @@ bot.recognizer(recognizer);
 var dialog = new builder.IntentDialog({ recognizer: [recognizer] });
 bot.dialog('Grretings', [
     function (session) {
-        if(session.userData.userName && session.userData.email && session.userData.mobile){
+        if (session.userData.userName && session.userData.email && session.userData.mobile) {
             //session.send("Hello " +session.userData.userName);
             session.beginDialog('ServiceOption');
             //session.beginDialog('UserProfile');
         }
-        else if(session.userData.userName && !session.userData.email){
-            session.send("Hello " +session.userData.userName);
+        else if (session.userData.userName && !session.userData.email) {
+            session.send("Hello " + session.userData.userName);
             session.beginDialog('Email');
         }
-        else if(session.userData.userName && session.userData.email&& !session.userData.mobile){
-            session.send("Hello " +session.userData.userName);
+        else if (session.userData.userName && session.userData.email && !session.userData.mobile) {
+            session.send("Hello " + session.userData.userName);
             session.beginDialog('Mobile');
         }
-        else{
-            builder.Prompts.text(session,"Welcome to the Car Service Center finder! May I know your name?");           
+        else {
+            builder.Prompts.text(session, "Welcome to the Car Service Center finder! May I know your name?");
         }
-            
+
     },
-    function(session,results){
+    function (session, results) {
         session.userData.userName = results.response;
         session.beginDialog('Email');
     }
-    
+
 ]).triggerAction({
     matches: 'Grretings'
 });
-bot.dialog('Email',[
+bot.dialog('Email', [
     function (session, results) {
         builder.Prompts.text(session, "Kindly provide your email for communication");
     },
@@ -89,8 +89,8 @@ bot.dialog('InvalidMobileNum', [
 
 bot.dialog('Mobile', [
     function (session, results) {
-        if(!session.userData.mobile)
-        builder.Prompts.text(session, "Kindly provide your 10 digit number for communication");
+        if (!session.userData.mobile)
+            builder.Prompts.text(session, "Kindly provide your 10 digit number for communication");
         else session.beginDialog('ServiceOption');
     },
     function (session, results) {
@@ -110,60 +110,74 @@ bot.dialog('ServiceOption', [
 ]);
 bot.dialog('UserProfile', [
     function (session, args, next) {
-        if(!session.userData.userName){
-        var nameEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'Name');
-        session.userData.userName = nameEntity?nameEntity.entity:"";
-        session.beginDialog('Email');
-    }
-    else
-    {
-        var email = builder.EntityRecognizer.findEntity(args.intent.entities, 'builtin.email');
-        session.userData.email = email;
-        ValidateEmail(session);
-    }
-   
+        if (!session.userData.userName) {
+            var nameEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'Name');
+            session.userData.userName = nameEntity ? nameEntity.entity : "";
+            session.beginDialog('Email');
+        }
+        else {
+            var email = builder.EntityRecognizer.findEntity(args.intent.entities, 'builtin.email');
+            session.userData.email = email.entity;
+            ValidateEmail(session);
+        }
+
     }
 ]).triggerAction({
     matches: 'UserProfile'
 });
 
 bot.dialog('Goodbye', [
-    function  (session) {
-        builder.Prompts.text(session,  "Bye. Looking forward to our next awesome conversation already.");
+    function (session) {
+        builder.Prompts.text(session, "Bye. Looking forward to our next awesome conversation already.");
     }
 ]).triggerAction({
-    matches:  'Goodbye'
+    matches: 'Goodbye'
 });
 bot.dialog('Booking', [
     function (session, results) {
         GetAvailableDates(session);
     }
 ]).triggerAction({
-    matches:  'Booking'
+    matches: 'Booking'
 });
 bot.dialog('SearchCarServiceCenter', [
     function (session, args, next) {
-        session.send('Welcome to the Car Service Center finder! We are analyzing your message: \'%s\'', session.message.text);
-        builder.Prompts.text(session, 'Please enter your destination');
-        // try extracting entities
-        // var cityEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'builtin.geography.city');
-        // var airportEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'AirportCode');
-        // if (cityEntity) {
-        //     // city entity detected, continue to next step
-        //     session.dialogData.searchType = 'city';
-        //     next({ response: cityEntity.entity });
-        // } else if (airportEntity) {
-        //     // airport entity detected, continue to next step
-        //     session.dialogData.searchType = 'airport';
-        //     next({ response: airportEntity.entity });
-        // } else {
-        // no entities detected, ask user for a destination
-        //builder.Prompts.text(session, 'Please enter your destination');
-        // }
+       if (session.userData.userName && session.userData.email && session.userData.mobile) {
+            session.send('Welcome to the Car Service Center finder! We are analyzing your message: \'%s\'', session.message.text);
+            //builder.Prompts.text(session, 'Please enter your destination');
+            // try extracting entities
+            var cityEntity = args && args.intent && args.intent.entities.length?builder.EntityRecognizer.findEntity(args.intent.entities, 'builtin.geography.city'):null;
+            var airportEntity = args && args.intent && args.intent.entities.length?builder.EntityRecognizer.findEntity(args.intent.entities, 'AirportCode'):null;
+            if (cityEntity) {
+                // city entity detected, continue to next step
+                session.dialogData.searchType = 'city';
+                next({ response: cityEntity.entity });
+            } else if (airportEntity) {
+                // airport entity detected, continue to next step
+                session.dialogData.searchType = 'airport';
+                next({ response: airportEntity.entity });
+            } else {
+                //no entities detected, ask user for a destination
+                builder.Prompts.text(session, 'Please enter your destination');
+            }
+         }
+        else {
+            if (!session.userData.userName) {
+                session.send("Kindly provide your details first");
+                session.beginDialog("Grretings");
+            }
+            else if (session.userData.userName && !session.userData.email) {
+                session.send(session.userData.userName + ", Kindly provide your few details before preceding");
+                session.beginDialog("Email");
+            }
+            else if (session.userData.userName && session.userData.email && session.userData.mobile) {
+                session.send(session.userData.userName + ", Kindly provide your few details before preceding");
+                session.beginDialog("Mobile");
+            }
+        }
     },
     function (session, results) {
         var destination = results.response;
-
         var message = 'Looking for Car Service Center....';
         // if (session.dialogData.searchType === 'airport') {
         //     message += ' near %s airport...';
@@ -195,10 +209,10 @@ bot.dialog('SearchCarServiceCenter', [
         session.beginDialog("Booking");
     }
 ]).triggerAction({
-    matches: 'SearchCarServiceCenter',
-    onInterrupted: function (session) {
-        session.send('Please provide a destination');
-    }
+    matches: 'SearchCarServiceCenter'
+    // onInterrupted: function (session) {
+    //     session.send('Please provide a destination');
+    //}
 });
 bot.dialog('GetDates', [
     function (session, result) {
@@ -221,10 +235,10 @@ bot.dialog('GetSlots', [
 ]);
 bot.dialog('BookingConfirmed', [
     function (session, results) {
-         var message = new builder.Message(session)
-                    .addAttachment(BookingConfirmedAsAttachemnt(session));
-                    session.send(message);
-                    //session.reset();
+        var message = new builder.Message(session)
+            .addAttachment(BookingConfirmedAsAttachemnt(session));
+        session.send(message);
+        //session.reset();
         session.endDialog("Happy to help");
     }
 ]);
@@ -295,12 +309,16 @@ function reviewAsAttachment(review) {
         .images([new builder.CardImage().url(review.image)]);
 }
 
-function BookingConfirmedAsAttachemnt(session){
+function BookingConfirmedAsAttachemnt(session) {
     return new builder.HeroCard()
-        .title(session.userData.userName+" your booking for "+session.userData.serviceType + " on "+session.userData.selectedDate+ " at " +session.userData.selectedSlot +" has been confirmed.")
+        .title(session.userData.userName + " your booking for " + session.userData.serviceType + " on " + session.userData.selectedDate + " at " + session.userData.selectedSlot + " has been confirmed.")
         .subtitle("Your communication details")
-        .text("Email- "+session.userData.email+" Mobile Number- "+session.userData.mobile)
+        .text("Email- " + session.userData.email + " Mobile Number- " + session.userData.mobile)
         .images([new builder.CardImage().url("~/image.png")]);
+}
+
+function DataCheck(session){
+    
 }
 
 /**
@@ -336,7 +354,7 @@ function GetAvailableSlots(session) {
 function BookSlot(session) {
     var hour = String(session.userData.selectedSlot).substring(0, 2);
     var min = String(session.userData.selectedSlot).substring(3, 5);
-    var url = "http://webapilearning20170517094105.azurewebsites.net/api/Employee/BookAppoitment/" + session.userData.selectedDate + "/" + hour + "/" + min + "/" + session.userData.userName + "/"+session.userData.email + "/"+ session.userData.mobile;
+    var url = "http://webapilearning20170517094105.azurewebsites.net/api/Employee/BookAppoitment/" + session.userData.selectedDate + "/" + hour + "/" + min + "/" + session.userData.userName + "/" + session.userData.email + "/" + session.userData.mobile;
     http.get(url, function (res) {
         res.on('data', function (data) {
             //session.userData.availableSlots = JSON.parse(data);
