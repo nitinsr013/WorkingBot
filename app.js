@@ -1,12 +1,15 @@
 // This loads the environment variables from the .env file
 require('dotenv-extended').load();
-
 var builder = require('botbuilder');
 var restify = require('restify');
 var Store = require('./store');
 var spellService = require('./spell-service');
 var prompts = require('./prompts');
 var http = require('http');
+var userMail = "";
+const nodemailer = require('nodemailer');
+const xoauth2 = require('xoauth2');
+
 // Setup Restify Server
 var server = restify.createServer();
 server.listen(process.env.port || process.env.PORT || 3979, function () {
@@ -129,6 +132,7 @@ bot.dialog('UserProfile', [
 bot.dialog('Goodbye', [
     function (session) {
         builder.Prompts.text(session, "Bye. Looking forward to our next awesome conversation already.");
+        session.userData = null;
     }
 ]).triggerAction({
     matches: 'Goodbye'
@@ -142,12 +146,12 @@ bot.dialog('Booking', [
 });
 bot.dialog('SearchCarServiceCenter', [
     function (session, args, next) {
-       if (session.userData.userName && session.userData.email && session.userData.mobile) {
+        if (session.userData.userName && session.userData.email && session.userData.mobile) {
             session.send('Welcome to the Car Service Center finder! We are analyzing your message: \'%s\'', session.message.text);
             //builder.Prompts.text(session, 'Please enter your destination');
             // try extracting entities
-            var cityEntity = args && args.intent && args.intent.entities.length?builder.EntityRecognizer.findEntity(args.intent.entities, 'builtin.geography.city'):null;
-            var airportEntity = args && args.intent && args.intent.entities.length?builder.EntityRecognizer.findEntity(args.intent.entities, 'AirportCode'):null;
+            var cityEntity = args && args.intent && args.intent.entities.length ? builder.EntityRecognizer.findEntity(args.intent.entities, 'builtin.geography.city') : null;
+            var airportEntity = args && args.intent && args.intent.entities.length ? builder.EntityRecognizer.findEntity(args.intent.entities, 'AirportCode') : null;
             if (cityEntity) {
                 // city entity detected, continue to next step
                 session.dialogData.searchType = 'city';
@@ -160,7 +164,7 @@ bot.dialog('SearchCarServiceCenter', [
                 //no entities detected, ask user for a destination
                 builder.Prompts.text(session, 'Please enter your destination');
             }
-         }
+        }
         else {
             if (!session.userData.userName) {
                 session.send("Kindly provide your details first");
@@ -235,11 +239,28 @@ bot.dialog('GetSlots', [
 ]);
 bot.dialog('BookingConfirmed', [
     function (session, results) {
+        userMail = session.userData.email;
         var message = new builder.Message(session)
             .addAttachment(BookingConfirmedAsAttachemnt(session));
         session.send(message);
-        //session.reset();
-        session.endDialog("Happy to help");
+        session.send('Sending confirmation email to  '+session.userData.email);
+        SendEmail(session);
+    },
+
+]);
+bot.dialog('Confirmation', [
+    function (session, results) {
+        builder.Prompts.choice(session, session.userData.userName + ", would you like to continue?", "Yes|No", { listStyle: builder.ListStyle.button });
+    },
+    function (session, results) {
+        if (results.response.entity == 'No') {
+            session.userData = null;
+            session.endDialog("Ending Conversation, Happy to help");
+            session.endConversation("");
+        }
+        if (results.response.entity == 'Yes') {
+            session.send(session.userData.userName + ", how can we help you?")
+        }
     }
 ]);
 bot.dialog('ShowCarServiceCentersReviews', function (session, args) {
@@ -317,7 +338,41 @@ function BookingConfirmedAsAttachemnt(session) {
         .images([new builder.CardImage().url("~/image.png")]);
 }
 
-function DataCheck(session){
+
+function SendEmail(session) {
+    var transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: 'hughesmail53@gmail.com',
+            pass: 'Bhanu@05',
+            xoauth2: xoauth2.createXOAuth2Generator({
+                user: 'hughesmail53@gmail.com',
+                clientId: '930280742263-93q1mjdoq2m02r3timeg8iajj6223imf.apps.googleusercontent.com',
+                clientSecret: 'b7BXcr2oKpbGY154bHkPwsSH',
+                refreshToken: '1/oBialtTpd09pFkkxnwTUgjAvviSz0WNYxdvZ5ifY4t8',
+                accessToken: 'ya29.GltVBBdxXr_AFmi9qnpKO54tzp1hyLIinKlzQsZZ0Sr1MU7QXvAc37I0l0UHXYJl8mnyVUXyYWebJ_Ixl5HVFmkJuenG7ns1GVaSj9oZawmNW7INiNX-OrMG6AVh'
+            })
+        }
+    });
+    var mailOptions = {
+        from: 'hughesmail53@gmail.com',
+        to: session.userData.email,
+        subject: 'Booking for ' + session.userData.serviceType + ' confirmed',
+        //text: 'text'
+        html: '<p>Hi '+ session.userData.userName+',</p></br><p>Your booking for '+ session.userData.serviceType+' on ' + session.userData.selectedDate+' at ' +  session.userData.selectedSlot+' has been confirmed.</p><p>Happy to help</p></br></br><h3>Regards</h3><h3>Hughes</h3>'
+    }
+    transporter.sendMail(mailOptions, function (err, res) {
+        if (err) {
+            session.send('Oops, something went wrong in sending email, will be sent later');
+            console.log(err);
+            session.beginDialog('Confirmation');
+        }
+        else {
+            session.send('Booking confirmed, confirmation email sent to ' + session.userData.email);
+            session.beginDialog('Confirmation');
+        }
+
+    })
     
 }
 
