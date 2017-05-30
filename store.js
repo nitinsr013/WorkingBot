@@ -7,7 +7,13 @@ var ReviewsOptions = [
     '“Lovely small car service center ideally situated to explore the area.”',
     '“Positive surprise”',
     '“Beautiful suite and resort”'];
-
+var address = [
+    "Himgiri Hyundai Service Center, Gurugram, Haryana",
+    "Hyundai Service Center, Near IOC Petrol Pump, Sector 52A, Wazirabad, Gurugram, Haryana",
+    "Skoda Service Centre, Gurugram, Haryana",
+    "Maruti Car Service Center - MeriCAR.com, Gurugram, Haryana",
+    "Big Swing Honda, Gurugram, Haryana"
+];
 module.exports = {
     searchHotels: function (destination) {
         return new Promise(function (resolve) {
@@ -17,7 +23,7 @@ module.exports = {
             for (var i = 1; i <= 5; i++) {
                 hotels.push({
                     name: destination + ' Car Service center ' + i,
-                    location: destination,
+                    location: address[i-1],
                     rating: Math.ceil(Math.random() * 5),
                     numberOfReviews: Math.floor(Math.random() * 5000) + 1,
                     priceStarting: Math.floor(Math.random() * 450) + 80,
