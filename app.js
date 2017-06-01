@@ -20,12 +20,22 @@ var connector = new builder.ChatConnector({
     appId: process.env.MICROSOFT_APP_ID,
     appPassword: process.env.MICROSOFT_APP_PASSWORD
 });
-server.post('/api/messages', connector.listen());
 
+server.post('/api/messages', connector.listen());
 var bot = new builder.UniversalBot(connector, function (session) {
     session.send('Sorry, I did not understand \'%s\'. Type \'help\' if you need assistance.', session.message.text);
 });
 
+// Send welcome when conversation with bot is started, by initiating the root dialog
+bot.on('conversationUpdate', function (message) {
+    if (message.membersAdded) {
+        message.membersAdded.forEach(function (identity) {
+            if (identity.id === message.address.bot.id) {
+                bot.beginDialog(message.address, 'Grretings');
+            }
+        });
+    }
+});
 
 
 // You can provide your own model by specifing the 'LUIS_MODEL_URL' environment variable
@@ -35,27 +45,42 @@ bot.recognizer(recognizer);
 var dialog = new builder.IntentDialog({ recognizer: [recognizer] });
 bot.dialog('Grretings', [
     function (session) {
-        if (session.userData.userName && session.userData.email && session.userData.mobile) {
-            //session.send("Hello " +session.userData.userName);
-            session.beginDialog('ServiceOption');
-            //session.beginDialog('UserProfile');
+        // if (session.userData.userName && session.userData.email && session.userData.mobile) {
+        //     //session.send("Hello " +session.userData.userName);
+        //     session.beginDialog('ServiceOption');
+        //     //session.beginDialog('UserProfile');
+        // }
+        // else if (session.userData.userName && !session.userData.email) {
+        //     session.send("Hello " + session.userData.userName);
+        //     session.beginDialog('Email');
+        // }
+        // else if (session.userData.userName && session.userData.email && !session.userData.mobile) {
+        //     session.send("Hello " + session.userData.userName);
+        //     session.beginDialog('Mobile');
+        // }
+        // else {
+            //builder.Prompts.text(session, "Hello, my name is Mayara. I can help you schedule a car service. Do you want me to help you?");
+        //}
+        builder.Prompts.choice(session, "Hello, my name is Mayara. I can help you schedule a car service. Do you want me to help you?", "Yes|No", { listStyle: builder.ListStyle.button });
+    },
+    function (session, results) {
+        if (results.response.entity == 'No') {
+            session.userData = null;
+            session.endDialog("No problem. Please feel free to tap on the chat box any time you want");
+            session.endConversation("");
         }
-        else if (session.userData.userName && !session.userData.email) {
-            session.send("Hello " + session.userData.userName);
-            session.beginDialog('Email');
+        if (results.response.entity == 'Yes') {
+            if (session.userData.userName){
+                session.beginDialog('ServiceOption');
+            }
+            else
+            builder.Prompts.text(session,"May I know your name?")
         }
-        else if (session.userData.userName && session.userData.email && !session.userData.mobile) {
-            session.send("Hello " + session.userData.userName);
-            session.beginDialog('Mobile');
-        }
-        else {
-            builder.Prompts.text(session, "Welcome to the Car Service Center finder! May I know your name?");
-        }
-
     },
     function (session, results) {
         session.userData.userName = results.response;
-        session.beginDialog('Email');
+        session.beginDialog('ServiceOption');
+        //session.beginDialog('Email');
     }
 
 ]).triggerAction({
@@ -63,7 +88,7 @@ bot.dialog('Grretings', [
 });
 bot.dialog('Email', [
     function (session, results) {
-        builder.Prompts.text(session, "Kindly provide your email for communication");
+        builder.Prompts.text(session, "Please provide an email so that I can send you a confirmation for your service");
     },
     function (session, results) {
         session.userData.email = results.response;
@@ -92,9 +117,9 @@ bot.dialog('InvalidMobileNum', [
 
 bot.dialog('Mobile', [
     function (session, results) {
-        if (!session.userData.mobile)
-            builder.Prompts.text(session, "Kindly provide your 10 digit number for communication");
-        else session.beginDialog('ServiceOption');
+       // if (!session.userData.mobile)
+            builder.Prompts.text(session, "Please provide a phone number incase a service agent needs to reach you");
+        //else session.beginDialog('ServiceOption');
     },
     function (session, results) {
         session.userData.mobile = results.response;
@@ -116,9 +141,9 @@ bot.dialog('UserProfile', [
         if (!session.userData.userName) {
             var nameEntity = builder.EntityRecognizer.findEntity(args.intent.entities, 'Name');
             session.userData.userName = nameEntity ? nameEntity.entity : "";
-            session.beginDialog('Email');
+            session.beginDialog('ServiceOption');
         }
-        else {
+         else if(!session.userData.email){
             var email = builder.EntityRecognizer.findEntity(args.intent.entities, 'builtin.email');
             session.userData.email = email.entity;
             ValidateEmail(session);
@@ -146,8 +171,8 @@ bot.dialog('Booking', [
 });
 bot.dialog('SearchCarServiceCenter', [
     function (session, args, next) {
-        if (session.userData.userName && session.userData.email && session.userData.mobile) {
-            session.send('Welcome to the Car Service Center finder! We are analyzing your message: \'%s\'', session.message.text);
+        if (session.userData.userName) {
+            //session.send(session.userData.userName + ', I am analyzing your message: \'%s\'', session.message.text);
             //builder.Prompts.text(session, 'Please enter your destination');
             // try extracting entities
             var cityEntity = args && args.intent && args.intent.entities.length ? builder.EntityRecognizer.findEntity(args.intent.entities, 'builtin.geography.city') : null;
@@ -162,23 +187,27 @@ bot.dialog('SearchCarServiceCenter', [
                 next({ response: airportEntity.entity });
             } else {
                 //no entities detected, ask user for a destination
-                builder.Prompts.text(session, 'Please enter your destination');
+                builder.Prompts.text(session, 'Please enter a location (address or zip code) so that I can look for a service center closest to you');
             }
         }
-        else {
-            if (!session.userData.userName) {
-                session.send("Kindly provide your details first");
+        else{
+            //session.send("I need your name before proceding");
                 session.beginDialog("Grretings");
-            }
-            else if (session.userData.userName && !session.userData.email) {
-                session.send(session.userData.userName + ", Kindly provide your few details before preceding");
-                session.beginDialog("Email");
-            }
-            else if (session.userData.userName && session.userData.email && session.userData.mobile) {
-                session.send(session.userData.userName + ", Kindly provide your few details before preceding");
-                session.beginDialog("Mobile");
-            }
         }
+        // else {
+        //     if (!session.userData.userName) {
+        //         session.send("Kindly provide your details first");
+        //         session.beginDialog("Grretings");
+        //     }
+        //     else if (session.userData.userName && !session.userData.email) {
+        //         session.send(session.userData.userName + ", Kindly provide your few details before preceding");
+        //         session.beginDialog("Email");
+        //     }
+        //     else if (session.userData.userName && session.userData.email && session.userData.mobile) {
+        //         session.send(session.userData.userName + ", Kindly provide your few details before preceding");
+        //         session.beginDialog("Mobile");
+        //     }
+        // }
     },
     function (session, results) {
         var destination = results.response;
@@ -220,7 +249,7 @@ bot.dialog('SearchCarServiceCenter', [
 });
 bot.dialog('GetDates', [
     function (session, result) {
-        builder.Prompts.choice(session, "Please select the any available date ", session.userData.availableDates, { listStyle: builder.ListStyle.button });
+        builder.Prompts.choice(session, "I have the following dates available for the selected service center: ", session.userData.availableDates, { listStyle: builder.ListStyle.button });
     },
     function (session, results) {
         session.userData.selectedDate = results.response.entity;
@@ -230,11 +259,23 @@ bot.dialog('GetDates', [
 
 bot.dialog('GetSlots', [
     function (session, result) {
-        builder.Prompts.choice(session, "Please select the any available slot ", session.userData.availableSlots, { listStyle: builder.ListStyle.button });
+        builder.Prompts.choice(session, "I have the following slot available for the selected service center: ", session.userData.availableSlots, { listStyle: builder.ListStyle.button });
     },
     function (session, results) {
         session.userData.selectedSlot = results.response.entity;
-        BookSlot(session);
+        builder.Prompts.choice(session,"You've asked for a "+session.userData.serviceType+" on "+session.userData.selectedDate+" at "+session.userData.selectedSlot+". Please confirm if this is correct","Confirm|Cancel",{ listStyle: builder.ListStyle.button });
+        //BookSlot(session);
+    },
+    function(session,results){
+       if (results.response.entity == 'Confirm') {
+           session.send("Thank you, your reservation is confirmed. You will receive an email with the details")
+            BookSlot(session);
+        }
+        if (results.response.entity == 'Cancel') {
+            session.userData = null;
+            session.endDialog("No problem. Please feel free to tap on the chat box any time you want");
+            session.endConversation("");
+        } 
     }
 ]);
 bot.dialog('BookingConfirmed', [
@@ -335,7 +376,7 @@ function BookingConfirmedAsAttachemnt(session) {
         .title(session.userData.userName + " your booking for " + session.userData.serviceType + " on " + session.userData.selectedDate + " at " + session.userData.selectedSlot + " has been confirmed.")
         .subtitle("Your communication details")
         .text("Email- " + session.userData.email + " Mobile Number- " + session.userData.mobile)
-        .images([new builder.CardImage().url("~/image.png")]);
+        .images("http://realtimedashbord20170501102742.azurewebsites.net/Content/Confirmation.png");
 }
 
 
@@ -413,7 +454,7 @@ function BookSlot(session) {
     http.get(url, function (res) {
         res.on('data', function (data) {
             //session.userData.availableSlots = JSON.parse(data);
-            session.beginDialog("BookingConfirmed");
+            session.beginDialog("Email");
         });
     })
 };
@@ -439,7 +480,7 @@ function ValidateEmail(session) {
 function ValidateMobileNum(session) {
     var re = /^\d{10}$/;
     if (re.test(session.userData.mobile)) {
-        session.beginDialog("ServiceOption");
+        session.beginDialog("BookingConfirmed");
     }
     else {
         session.beginDialog("InvalidMobileNum");
