@@ -27,7 +27,7 @@ module.exports = {
                     rating: Math.ceil(Math.random() * 5),
                     numberOfReviews: Math.floor(Math.random() * 5000) + 1,
                     priceStarting: Math.floor(Math.random() * 450) + 80,
-                    image: 'https://placeholdit.imgix.net/~text?txtsize=35&txt=Car%20Service Center+' + i + '&w=500&h=260'
+                    image: 'http://realtimedashbord20170501102742.azurewebsites.net/Content/CarService'+i+'.png '
                 });
             }
 
